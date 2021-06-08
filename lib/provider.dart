@@ -16,7 +16,9 @@ class Provider extends StatefulWidget {
   Provider({
     required this.dependencies,
     required this.child,
-  }) : log = Logger("Provider");
+    Key? key,
+  })  : log = Logger('Provider'),
+        super(key: key);
 
   static T of<T>(BuildContext context, {Type? aspect}) {
     final Dependencies? dependencies =
@@ -215,7 +217,7 @@ class ProviderState extends State<Provider> {
       stream: _readyForRender,
       builder: (context, snapshot) {
         return Dependencies(
-          key: Key("Version: " + _dependenciesVersion.toString()),
+          key: Key('Version: ' + _dependenciesVersion.toString()),
           dependencies: snapshot.data!,
           child: widget.child,
           addDependenciesController: addDependenciesController,
