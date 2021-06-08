@@ -18,11 +18,47 @@ class Provider extends StatefulWidget {
     required this.child,
   }) : log = Logger("Provider");
 
-  static Dependencies of(BuildContext context, {Type? aspect}) {
-    final Dependencies? result =
+  static T of<T>(BuildContext context, {Type? aspect}) {
+    final Dependencies? dependencies =
         InheritedModel.inheritFrom<Dependencies>(context, aspect: aspect);
-    if (result == null) throw NoProviderFound();
-    return result;
+
+    if (dependencies == null) throw NoProviderFound();
+
+    return dependencies.find<T>(throwException: true);
+  }
+
+  static void updateDependency<OldDependencyType>(
+    BuildContext context,
+    Object newDependency,
+  ) {
+    final Dependencies? dependencies =
+        InheritedModel.inheritFrom<Dependencies>(context);
+
+    if (dependencies == null) throw NoProviderFound();
+
+    final deps = List.from(dependencies.dependencies);
+
+    final dependency =
+        deps.firstWhere((dep) => dep.runtimeType == OldDependencyType);
+
+    final indexOfDependency = deps.indexOf(dependency);
+    deps[indexOfDependency] = newDependency;
+
+    dependencies.updateDependencies(deps);
+  }
+
+  static void addDependency(
+    BuildContext context,
+    Object newDependency,
+  ) {
+    final Dependencies? dependencies =
+        InheritedModel.inheritFrom<Dependencies>(context);
+
+    if (dependencies == null) throw NoProviderFound();
+
+    final deps = List.from(dependencies.dependencies)..add(newDependency);
+
+    dependencies.addDependencies(deps);
   }
 
   @override
@@ -64,15 +100,13 @@ class ProviderState extends State<Provider> {
     addDependencies = addDependenciesController.stream.asBroadcastStream();
 
     addDependenciesSubscription = addDependencies.listen((dependencies) {
-      WidgetsBinding.instance!.addPostFrameCallback((_) {
-        _dependencies = _addDependencies(
-          allDependencies: _dependencies,
-          dependencies: dependencies,
-        );
+      _dependencies = _addDependencies(
+        oldDependencies: _dependencies,
+        newDependencies: dependencies,
+      );
 
-        _dependenciesVersion++;
-        _readyForRenderController.add(_dependencies);
-      });
+      _dependenciesVersion++;
+      _readyForRenderController.add(_dependencies);
     });
 
     removeDependenciesController = StreamController<List>();
@@ -81,8 +115,8 @@ class ProviderState extends State<Provider> {
 
     removeDependenciesSubscription = removeDependencies.listen((dependencies) {
       _dependencies = _removeDependencies(
-        allDependencies: _dependencies,
-        dependencies: dependencies,
+        oldDependencies: _dependencies,
+        newDependencies: dependencies,
       );
 
       _dependenciesVersion++;
@@ -94,15 +128,13 @@ class ProviderState extends State<Provider> {
         updateDependenciesController.stream.asBroadcastStream();
 
     updateDependenciesSubscription = updateDependencies.listen((dependencies) {
-      WidgetsBinding.instance!.addPostFrameCallback((_) {
-        _dependencies = _updateDependencies(
-          allDependencies: _dependencies,
-          dependencies: dependencies,
-        );
+      _dependencies = _updateDependencies(
+        oldDependencies: _dependencies,
+        newDependencies: dependencies,
+      );
 
-        _dependenciesVersion++;
-        _readyForRenderController.add(_dependencies);
-      });
+      _dependenciesVersion++;
+      _readyForRenderController.add(_dependencies);
     });
 
     _readyForRenderController = StreamController<List>();
@@ -110,51 +142,44 @@ class ProviderState extends State<Provider> {
   }
 
   List _addDependencies({
-    required List allDependencies,
-    required List dependencies,
+    required List oldDependencies,
+    required List newDependencies,
   }) {
-    final dependenciesForUpdate = allDependencies
-        .where((element) => dependencies.contains(element.runtimeType))
-        .toList();
-
-    final updatedDependencies = _updateDependencies(
-      allDependencies: allDependencies,
-      dependencies: dependenciesForUpdate,
-    );
-
-    updatedDependencies.addAll(dependencies);
-
-    return allDependencies;
+    final dependencies = [];
+    dependencies..addAll(oldDependencies)..addAll(newDependencies);
+    return dependencies;
   }
 
   List _removeDependencies({
-    required List allDependencies,
-    required List dependencies,
+    required List oldDependencies,
+    required List newDependencies,
   }) {
-    for (final dep in dependencies) {
-      allDependencies.remove(dep);
+    for (final dep in newDependencies) {
+      oldDependencies.remove(dep);
     }
 
-    return allDependencies;
+    return oldDependencies;
   }
 
   List _updateDependencies({
-    required List allDependencies,
-    required List dependencies,
+    required List oldDependencies,
+    required List newDependencies,
   }) {
-    for (final dep in dependencies) {
-      final dependency = allDependencies.firstWhere(
-          (element) => element.runtimeType == dep.runtimeType,
+    final dependencies = [];
+
+    for (final newDep in newDependencies) {
+      final oldDep = oldDependencies.firstWhere(
+          (oldDep) => oldDep.runtimeType == newDep.runtimeType,
           orElse: () => null);
 
-      if (dependency == null) {
-        allDependencies.add(dependency);
+      if (oldDep == null) {
+        dependencies.add(oldDep);
       } else {
-        allDependencies.remove(dependency);
+        dependencies.add(newDep);
       }
     }
 
-    return allDependencies;
+    return dependencies;
   }
 
   @override
