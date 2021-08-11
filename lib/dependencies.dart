@@ -22,7 +22,7 @@ class Dependencies extends InheritedModel<Type> {
         _updateDependenciesController = updateDependenciesController,
         super(key: key, child: child);
 
-  T find<T>({bool throwException = false}) {
+  T find<T>() {
     T? dependency;
 
     for (final dep in dependencies) {
@@ -32,6 +32,7 @@ class Dependencies extends InheritedModel<Type> {
     }
 
     if (dependency == null) throw NoDependencyFound();
+
     return dependency;
   }
 

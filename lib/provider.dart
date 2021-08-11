@@ -20,13 +20,18 @@ class Provider extends StatefulWidget {
   })  : log = Logger('Provider'),
         super(key: key);
 
-  static T of<T>(BuildContext context, {Type? aspect}) {
-    final Dependencies? dependencies =
-        InheritedModel.inheritFrom<Dependencies>(context, aspect: aspect);
+  static T of<T>(
+    BuildContext context, {
+    Type? aspect,
+  }) {
+    final Dependencies? dependencies = InheritedModel.inheritFrom<Dependencies>(
+      context,
+      aspect: aspect,
+    );
 
     if (dependencies == null) throw NoProviderFound();
 
-    return dependencies.find<T>(throwException: true);
+    return dependencies.find<T>();
   }
 
   static void updateDependency<OldDependencyType>(
@@ -68,10 +73,6 @@ class Provider extends StatefulWidget {
 }
 
 class ProviderState extends State<Provider> {
-  late int _dependenciesVersion;
-
-  late List _dependencies;
-
   late final StreamController<List> addDependenciesController;
   late final Stream<List> addDependencies;
   late final StreamSubscription addDependenciesSubscription;
@@ -83,6 +84,10 @@ class ProviderState extends State<Provider> {
   late final StreamController<List> updateDependenciesController;
   late final Stream<List> updateDependencies;
   late final StreamSubscription updateDependenciesSubscription;
+
+  late int _dependenciesVersion;
+
+  late List _dependencies;
 
   late final StreamController<List> _readyForRenderController;
   late final Stream<List> _readyForRender;
@@ -143,12 +148,49 @@ class ProviderState extends State<Provider> {
     _readyForRender = _readyForRenderController.stream;
   }
 
+  @override
+  void dispose() {
+    addDependenciesSubscription.cancel();
+    addDependenciesController.close();
+
+    removeDependenciesSubscription.cancel();
+    removeDependenciesController.close();
+
+    updateDependenciesSubscription.cancel();
+    updateDependenciesController.close();
+
+    _readyForRenderController.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List>(
+      initialData: _dependencies,
+      stream: _readyForRender,
+      builder: (context, snapshot) {
+        final dependencies = snapshot.data;
+        if (dependencies == null) return Container();
+
+        return Dependencies(
+          key: Key('Version: ' + _dependenciesVersion.toString()),
+          dependencies: dependencies,
+          child: widget.child,
+          addDependenciesController: addDependenciesController,
+          removeDependenciesController: removeDependenciesController,
+          updateDependenciesController: updateDependenciesController,
+        );
+      },
+    );
+  }
+
   List _addDependencies({
     required List oldDependencies,
     required List newDependencies,
   }) {
     final dependencies = [];
     dependencies..addAll(oldDependencies)..addAll(newDependencies);
+
     return dependencies;
   }
 
@@ -171,8 +213,9 @@ class ProviderState extends State<Provider> {
 
     for (final newDep in newDependencies) {
       final oldDep = oldDependencies.firstWhere(
-          (oldDep) => oldDep.runtimeType == newDep.runtimeType,
-          orElse: () => null);
+        (oldDep) => oldDep.runtimeType == newDep.runtimeType,
+        orElse: () => null,
+      );
 
       if (oldDep == null) {
         dependencies.add(oldDep);
@@ -182,49 +225,5 @@ class ProviderState extends State<Provider> {
     }
 
     return dependencies;
-  }
-
-  @override
-  void dispose() {
-    // try {
-    //   for (final dep in widget.dependencies) {
-    //     dep.dispose();
-    //   }
-    //   // ignore: avoid_catching_errors
-    // } on NoSuchMethodError catch (error) {
-    //   widget.log.info(error);
-    // } on Exception catch (exception) {
-    //   widget.log.info(exception);
-    // }
-
-    addDependenciesSubscription.cancel();
-    addDependenciesController.close();
-
-    removeDependenciesSubscription.cancel();
-    removeDependenciesController.close();
-
-    updateDependenciesSubscription.cancel();
-    updateDependenciesController.close();
-
-    _readyForRenderController.close();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<List>(
-      initialData: _dependencies,
-      stream: _readyForRender,
-      builder: (context, snapshot) {
-        return Dependencies(
-          key: Key('Version: ' + _dependenciesVersion.toString()),
-          dependencies: snapshot.data!,
-          child: widget.child,
-          addDependenciesController: addDependenciesController,
-          removeDependenciesController: removeDependenciesController,
-          updateDependenciesController: updateDependenciesController,
-        );
-      },
-    );
   }
 }
