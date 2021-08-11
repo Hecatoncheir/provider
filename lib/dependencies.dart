@@ -26,7 +26,7 @@ class Dependencies extends InheritedModel<Type> {
     T? dependency;
 
     for (final dep in dependencies) {
-      if (dep.runtimeType != T) continue;
+      if (dep is! T) continue;
       dependency = dep;
       break;
     }
